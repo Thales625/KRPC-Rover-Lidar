@@ -4,7 +4,6 @@ from threading import Thread
 from Display import Display
 from Map import Map
 from WheelController import WheelController
-import atexit
 
 
 class LidarRaycast():
@@ -16,7 +15,6 @@ class LidarRaycast():
         self.body_ref = self.body.reference_frame
         self.surface_ref = self.rover.surface_reference_frame
         self.flight = self.rover.flight(self.body_ref)
-        #self.drawing = self.conn.drawing
 
         # Streams
         self.speed = self.conn.add_stream(getattr, self.flight, "horizontal_speed")
@@ -30,23 +28,25 @@ class LidarRaycast():
             print('Não foi possível encontrar Lidar.')
             exit()
 
+        self.target = self.space_center.target_vessel
+        if self.target == None:
+            print('Selecione um alvo!')
+            exit()
+
+
         self.rotation_right = True
 
-        self.max_angle = 180 # POSITIVE <- Max 180
+        self.max_angle = 45 # POSITIVE <- Max 180
         self.min_angle = -self.max_angle
+        self.step_angle = 3
+        self.actual_angle = 0
 
         self.mean_angle = (abs(self.min_angle)+abs(self.max_angle)) // 2
 
         self.lidar_distance = 50
         self.lidar_ref = self.lidar.reference_frame
-        #self.lidar_laser = self.drawing.add_direction((0, 0, -1), self.lidar_ref, self.lidar_distance)
-        #self.lidar_laser.thickness = 0.05
-        #self.lidar_laser.color = (255, 0, 0)
 
         self.distances = [self.lidar_distance + 1 for i in range(self.min_angle, self.max_angle + 1)]
-
-        self.step_angle = 2
-        self.actual_angle = 0
 
         # Batery
         self.batery_limit = self.rover.resources.max('ElectricCharge')
@@ -102,7 +102,6 @@ class LidarRaycast():
         Thread(target=self.map.start_loop).start()
 
         # WHEEL CONTROLLER
-        self.target = self.space_center.target_vessel
         self.target_flight = self.target.flight(self.body_ref)
         # -> Stream Lng / Lat
         self.target_lng = self.conn.add_stream(getattr, self.target_flight, "longitude")
@@ -112,8 +111,6 @@ class LidarRaycast():
         self.controller.set_target_pos(self.target.position(self.surface_ref))
         Thread(target=self.controller.start_loop).start()
 
-        # Exit Function
-        atexit.register(self.stop_threads)
 
         # Main Loop
         while True:
@@ -145,6 +142,7 @@ class LidarRaycast():
             # Display -> Update
             self.frame.distances = self.distances
             self.frame.actual_angle = self.actual_angle
+            self.frame.target_angle = self.controller.error_angle
             # Update dynamic texts
             batery = ceil((self.rover.resources.amount("ElectricCharge") / self.batery_limit) * 100)
             self.frame.texts[0][1]['text'] = f'{batery}%'
@@ -170,20 +168,15 @@ class LidarRaycast():
             self.map.objects = [
                 {
                     'pos': (self.longitude(), self.latitude()),
-                    'radius': 2,
+                    'radius': 5,
                     'color': (0, 0, 255)
                 },
                 {
                     'pos': (self.target_lng(), self.target_lat()),
-                    'radius': 1,
+                    'radius': 3,
                     'color': (255, 0, 0)
                 }
             ]
 
     def set_angle_value(self, angle, value):
         self.distances[angle + self.mean_angle] = value
-
-    def stop_threads(self):
-        self.frame.running = False
-        self.map.running = False
-        self.controller.running = False

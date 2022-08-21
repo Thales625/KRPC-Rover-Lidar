@@ -1,4 +1,3 @@
-import math
 import time
 
 
@@ -17,7 +16,7 @@ class PIDController:
         if value > self.max_out_limit:
             return self.max_out_limit
         else:
-            return math.max(value, self.min_out_limit)
+            return max(value, self.min_out_limit)
 
     def calc_pid(self, current_value, limit_value):
         now = float(time.time())
@@ -36,7 +35,7 @@ class PIDController:
             self.last_value = current_value
             self.last_time = now
 
-        return limit_value(
+        return self.limit_value(
             self.proportional_term + self.ki * self.integral_term + self.derivative_term
         )
 

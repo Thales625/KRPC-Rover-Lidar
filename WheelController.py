@@ -28,9 +28,7 @@ class WheelController():
 
         self.throttle_pid.adjust_pid(0.5, 0.1, 0.5)
 
-        self.throttle_pid.limite_pid(self.speed_target)
         self.throttle_pid.limit_output(-1, 1)
-        self.steering_pid.limite_pid(0)
         self.steering_pid.limit_output(-1, 1)
 
     

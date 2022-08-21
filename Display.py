@@ -16,6 +16,7 @@ class Display():
         self.width = self.lidar_distance*self.expand*2 + self.border
         self.height = self.width
         self.rover_pos = (self.width//2, self.height//2)
+        self.target_angle = 0
 
         self.rover_color = (255, 255, 255)
         self.rover_radius = 2
@@ -43,6 +44,7 @@ class Display():
             self.screen = cv2.circle(self.screen, self.rover_pos, self.rover_radius, self.rover_color, -1)
             self.screen = cv2.ellipse(self.screen, self.rover_pos, (self.lidar_distance*self.expand, self.lidar_distance*self.expand), 0, self.interval_angle[0], self.interval_angle[1], (0, 10, 0), 1)
             self.screen = cv2.line(self.screen, self.rover_pos, np.array(self.rover_pos) + np.array([1, 0])*self.lidar_distance*self.expand, (128, 128, 128), 1)
+            self.screen = cv2.line(self.screen, self.rover_pos, self.angle_to_pos(self.target_angle, self.lidar_distance), (255, 0, 255), 1)
 
             # Draw Obstacles
             for i, dist in enumerate(self.distances):
