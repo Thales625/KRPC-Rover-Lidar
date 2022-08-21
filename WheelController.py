@@ -55,7 +55,7 @@ class WheelController():
                 self.rover.control.brakes = True
                 self.rover.control.wheel_throttle = 0
                 self.rover.control.wheel_steering = 0
-                self.target_dist = 'Chegou'
+                self.target_dist = 0
                 self.error_angle = 0
                 self.running = False
 
