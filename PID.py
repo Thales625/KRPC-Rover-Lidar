@@ -1,83 +1,54 @@
+import math
 import time
+
 
 class PIDController:
     __name__ = "PIDController"
-    saida_min, saida_max = -1, 1  # valores de saída padrão
-    kp, ki, kd = 0.025, 0.001, 0.1  # variáveis de ajuste padrão do PID
-    tempo_amostra = 0.025  # tempo de amostragem padrão
+    min_out_limit, max_out_limit = -1.0, 1.0
+    kp, ki, kd = 0.025, 0.001, 0.1
+    proportional_term, integral_term, derivative_term = 0.0, 0.0, 0.0
+    last_value, last_time = 0.0, 0.0
+    time_sample = 0.025
 
     def __init__(self):
         super(PIDController, self).__init__()
-        self.valor_entrada, self.valor_saida, self.valor_limite = 0, 0, 0
-        self.ult_valor_entrada = 0  # variáveis de cálculo de erro
-        self.ult_calculo = 0  # tempo do último cálculo
-        self.termo_integral = 0
-        self.agora = 0
-        self.mudanca_tempo = 0
-        self.erro = 0
-        self.dvalor_entrada = 0
 
-    def computar_pid(self):
-        self.agora = float(time.time())
-        # variável que busca o tempo imediato
-        self.mudanca_tempo = float(self.agora - self.ult_calculo)
-        # variável que compara o tempo de cálculo
-        if self.mudanca_tempo >= self.tempo_amostra:
-            # se a mudança for maior que o tempo de amostra, o cálculo é feito.
-            # variáveis para o cálculo do valor de saída
-            self.erro = self.valor_limite - self.valor_entrada
-            self.termo_integral += self.ki * self.erro
-            if self.termo_integral > self.saida_max:
-                self.termo_integral = self.saida_max
-            elif self.termo_integral < self.saida_min:
-                self.termo_integral = self.saida_min
-            self.dvalor_entrada = (self.valor_entrada - self.ult_valor_entrada)
+    def limit_value(self, value):
+        if value > self.max_out_limit:
+            return self.max_out_limit
+        else:
+            return math.max(value, self.min_out_limit)
 
-            # computando o valor de saída
-            self.valor_saida = self.kp * self.erro + self.ki * self.termo_integral - self.kd * self.dvalor_entrada
-            # Limitando o valor de saída
-            if self.valor_saida > self.saida_max:
-                self.valor_saida = self.saida_max
-            elif self.valor_saida < self.saida_min:
-                self.valor_saida = self.saida_min
+    def calc_pid(self, current_value, limit_value):
+        now = float(time.time())
+        change_in_time = float(now - self.last_time)
 
-        # Relembrando os valores atuais para a próxima vez
-        self.ult_valor_entrada = self.valor_entrada
-        self.ult_calculo = self.agora
+        if change_in_time >= self.time_sample:
+            error = limit_value - current_value
+            change_in_values = current_value - self.last_value
 
-        # Retornando o valor para quem chamou esse método
-        return self.valor_saida
+            self.proportional_term = self.kp * error
+            self.integral_term = self.limit_value(
+                self.integral_term + self.ki * error
+            )
+            self.derivative_term = self.kd * -change_in_values
 
-    def entrada_pid(self, valor=None):
-        """Valor de entrada (comparação) do cálculo PID"""
-        if valor is None:
-            return self.valor_entrada
-        self.valor_entrada = valor
+            self.last_value = current_value
+            self.last_time = now
 
-    def limite_pid(self, valor=None):
-        """Valor limite, para comparar o valor de entrada do cálculo PID"""
-        if valor is None:
-            return self.valor_limite
-        self.valor_limite = valor
+        return limit_value(
+            self.proportional_term + self.ki * self.integral_term + self.derivative_term
+        )
 
-    def limitar_saida(self, minimo, maximo):
+    def limit_output(self, min, max):
         """Restringe o valor de saída do cálculo PID"""
-        if minimo > maximo:
+        if min > max:
             return
-        self.saida_min = minimo
-        self.saida_max = maximo
+        self.min_out_limit = min
+        self.max_out_limit = max
+        self.integral_term = self.limit_value(self.integral_term)
 
-        if self.termo_integral > self.saida_max:
-            self.termo_integral = self.saida_max
-        elif self.termo_integral < self.saida_min:
-            self.termo_integral = self.saida_min
-
-        if self.valor_saida > self.saida_max:
-            self.valor_saida = self.saida_max
-        elif self.valor_saida < self.saida_min:
-            self.valor_saida = self.saida_min
-
-    def ajustar_pid(self, kp=None, ki=None, kd=None):
+    def adjust_pid(self, kp=None, ki=None, kd=None):
         """Ajuste dos parâmetros do cálculo PID
         Recebe valores novos se válidos, e retorna os valores"""
         if kp is None:
@@ -89,9 +60,3 @@ class PIDController:
         self.kp = kp if kp > 0 else __class__.kp
         self.ki = ki if ki > 0 else __class__.ki
         self.kd = kd if kd > 0 else __class__.kd
-
-    def tempo_amostragem(self, tempo_amostra=None):
-        """Tempo para fazer amostragem dos valores em milissegundos"""
-        if tempo_amostra is None:
-            return self.tempo_amostra
-        self.tempo_amostra = float(tempo_amostra / 1000) if tempo_amostra > 0 else __class__.tempo_amostra

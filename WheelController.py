@@ -26,12 +26,12 @@ class WheelController():
         self.throttle_pid = PIDController()
         self.steering_pid = PIDController()
 
-        self.throttle_pid.ajustar_pid(0.5, 0.1, 0.5)
+        self.throttle_pid.adjust_pid(0.5, 0.1, 0.5)
 
         self.throttle_pid.limite_pid(self.speed_target)
-        self.throttle_pid.limitar_saida(-1, 1)
+        self.throttle_pid.limit_output(-1, 1)
         self.steering_pid.limite_pid(0)
-        self.steering_pid.limitar_saida(-1, 1)
+        self.steering_pid.limit_output(-1, 1)
 
     
 
@@ -48,14 +48,8 @@ class WheelController():
             error_dir = target_dir - rover_dir
             self.error_angle = degrees(atan(error_dir[0]/error_dir[1]))
 
-            self.throttle_pid.limite_pid(self.speed_target)
-            self.steering_pid.limite_pid(self.steering_target)
-
-            self.throttle_pid.entrada_pid(self.speed)
-            self.steering_pid.entrada_pid(self.error_angle)
-
-            self.rover.control.wheel_throttle = self.throttle_pid.computar_pid()
-            self.rover.control.wheel_steering = self.steering_pid.computar_pid()
+            self.rover.control.wheel_throttle = self.throttle_pid.calc_pid(self.speed ,self.speed_target)
+            self.rover.control.wheel_steering = self.steering_pid.calc_pid(self.error_angle, self.steering_target)
 
             if self.target_dist < self.safe_distance:
                 self.rover.control.brakes = True
