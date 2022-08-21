@@ -19,7 +19,7 @@ class WheelController():
         self.rover.control.wheel_steering = 0
 
         self.safe_distance = 50
-        self.speed_target = 10
+        self.speed_target = 5
         self.steering_target = 0
 
         # PID

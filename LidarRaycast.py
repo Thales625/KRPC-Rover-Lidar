@@ -116,7 +116,6 @@ class LidarRaycast():
         while True:
             self.actual_direction = (-sin(radians(self.actual_angle)), 0.01, -cos(radians(self.actual_angle)))
             laser_distance = min(self.lidar_distance+1, self.space_center.raycast_distance((0, .1, 0), self.actual_direction, self.lidar_ref))
-            #self.lidar_laser.end = np.array(self.actual_direction) * laser_distance
 
             self.set_angle_value(self.actual_angle, laser_distance)
 
@@ -180,3 +179,6 @@ class LidarRaycast():
 
     def set_angle_value(self, angle, value):
         self.distances[angle + self.mean_angle] = value
+
+    def distances_to_positions(self):
+        [print(angle) for (angle, i) in (range(self.distances))]
