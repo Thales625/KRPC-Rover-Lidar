@@ -35,11 +35,66 @@ class LidarRaycast():
             print('Selecione um alvo!')
             exit()
 
-        self.show_map = False
-        self.show_display = False
+        self.SHOW_MAP = False
+        self.SHOW_DISPLAY = True
 
-        if self.show_display:
-            # DISPLAY
+
+        # MAP
+        if self.SHOW_MAP:
+            self.map = Map(self.body.name.lower())
+            Thread(target=self.map.start_loop).start()
+
+
+        # WHEEL CONTROLLER
+        self.target_flight = self.target.flight(self.body_ref)
+        # -> Stream Lng / Lat
+        self.target_lng = self.conn.add_stream(getattr, self.target_flight, "longitude")
+        self.target_lat = self.conn.add_stream(getattr, self.target_flight, "latitude")
+
+        self.controller = WheelController(self.space_center, self.rover, self.surface_ref)
+        self.controller.set_target_pos(self.target.position(self.surface_ref))
+        Thread(target=self.controller.start_loop).start()
+
+
+        # Batery
+        self.batery_limit = self.rover.resources.max('ElectricCharge')
+
+
+        # Initializing
+        self.rotation_right = True
+
+        self.max_angle = 45 # POSITIVE <- Max 180
+        self.min_angle = -self.max_angle
+        self.step_angle = 3
+        self.actual_angle = 0
+
+        self.mean_angle = (abs(self.min_angle)+abs(self.max_angle)) // 2
+
+        self.lidar_distance = 50
+        self.lidar_ref = self.lidar.reference_frame
+
+        self.distances = [
+            {
+                'distance': self.lidar_distance + 1,
+                'inclination': 0
+            } for i in range(self.min_angle, self.max_angle + 1)
+        ]
+
+
+        # LASERS
+        self.laser_1 = self.drawing.add_direction((0, 0, 0), self.lidar_ref)
+        self.laser_1.start = (0, .1, 0)
+        self.laser_1.color = (255, 0, 0)
+
+        self.sensor_2_angle = 20
+        self.sensor_2_dir_default = np.array([0, -cos(radians(90 - self.sensor_2_angle)), -sin(radians(90 - self.sensor_2_angle))])
+        self.laser_2 = self.drawing.add_direction((0, 0, 0), self.lidar_ref)
+        self.laser_2.start = (0, .1, 0)
+        self.laser_2.color = (255, 0, 0)
+
+
+        # DISPLAY
+        if self.SHOW_DISPLAY:
             self.frame = Display(self.lidar_distance, [self.min_angle, self.max_angle])
             Thread(target=self.frame.start_loop).start()
             self.frame.texts = [
@@ -84,70 +139,33 @@ class LidarRaycast():
                     }
                 ]
             ]
-
-        if self.show_map:
-            # MAP
-            self.map = Map(self.body.name.lower())
-            Thread(target=self.map.start_loop).start()
-
-
-        # WHEEL CONTROLLER
-        self.target_flight = self.target.flight(self.body_ref)
-        # -> Stream Lng / Lat
-        self.target_lng = self.conn.add_stream(getattr, self.target_flight, "longitude")
-        self.target_lat = self.conn.add_stream(getattr, self.target_flight, "latitude")
-
-        self.controller = WheelController(self.space_center, self.rover, self.surface_ref)
-        self.controller.set_target_pos(self.target.position(self.surface_ref))
-        Thread(target=self.controller.start_loop).start()
-
-        # Batery
-        self.batery_limit = self.rover.resources.max('ElectricCharge')
-
-        # Initializing
-        self.rotation_right = True
-
-        self.max_angle = 45 # POSITIVE <- Max 180
-        self.min_angle = -self.max_angle
-        self.step_angle = 3
-        self.actual_angle = 0
-
-        self.mean_angle = (abs(self.min_angle)+abs(self.max_angle)) // 2
-
-        self.lidar_distance = 50
-        self.lidar_ref = self.lidar.reference_frame
-
-        self.distances = [self.lidar_distance + 1 for i in range(self.min_angle, self.max_angle + 1)]
-
-        # Lasers
-        self.laser_1 = self.drawing.add_direction((0, 0, 0), self.lidar_ref)
-        self.laser_1.start = (0, .1, 0)
-        self.laser_1.color = (255, 0, 0)
-
-        self.sensor_2_angle = 20
-        self.sensor_2_dir_default = np.array([0, -cos(radians(90 - self.sensor_2_angle)), -sin(radians(90 - self.sensor_2_angle))])
-        self.laser_2 = self.drawing.add_direction((0, 0, 0), self.lidar_ref)
-        self.laser_2.start = (0, .1, 0)
-        self.laser_2.color = (255, 0, 0)
-
         
-        # Main Loop
+
+        # MAIN LOOP
         while True:
+            inclination = 0
             self.sensor_1_dir = np.array([-sin(radians(self.actual_angle)), 0, -cos(radians(self.actual_angle))])
-            self.sensor_2_dir = (self.sensor_1_dir + [0, self.sensor_2_dir_default[1], 0])
             laser_1_distance = min(self.lidar_distance+1, self.space_center.raycast_distance((0, .1, 0), self.sensor_1_dir, self.lidar_ref))
-            laser_2_distance = min(self.lidar_distance+1, self.space_center.raycast_distance((0, .1, 0), self.sensor_2_dir, self.lidar_ref))
 
             if laser_1_distance <= self.lidar_distance:
-                inclination = atan((sin(radians(self.sensor_2_angle)) * laser_2_distance) / (laser_1_distance - (cos(radians(self.sensor_2_angle)) * laser_2_distance)))
-                print(degrees(inclination))
+                self.sensor_2_dir = (self.sensor_1_dir + [0, self.sensor_2_dir_default[1], 0])
+                laser_2_distance = min(self.lidar_distance+1, self.space_center.raycast_distance((0, .1, 0), self.sensor_2_dir, self.lidar_ref))
+                inclination = degrees(atan((sin(radians(self.sensor_2_angle)) * laser_2_distance) / (laser_1_distance - (cos(radians(self.sensor_2_angle)) * laser_2_distance))))
 
+            else:
+                laser_1_distance = self.lidar_distance+1
+                self.sensor_2_dir = np.array([.0, .0, .0])
+
+        
 
             # Update Drawing
             self.laser_1.end = self.sensor_1_dir * self.lidar_distance
             self.laser_2.end = self.sensor_2_dir * self.lidar_distance
 
-            self.set_angle_value(self.actual_angle, laser_1_distance)
+            self.set_angle_data(self.actual_angle, {
+                "distance": laser_1_distance,
+                "inclination": inclination
+            })
 
             # Rotation
             if self.actual_angle >= self.max_angle:
@@ -166,9 +184,10 @@ class LidarRaycast():
             self.controller.set_target_pos(target_pos)
             speed = self.speed()
             self.controller.speed = speed
+            self.controller.distances = self.distances
             
 
-            if self.show_display:
+            if self.SHOW_DISPLAY:
                 # Display -> Update
                 self.frame.distances = self.distances
                 self.frame.actual_angle = self.actual_angle
@@ -193,7 +212,7 @@ class LidarRaycast():
                 self.frame.texts[3][1]['text'] = f'{error_angle:.2f}Deg'
                 self.frame.texts[3][1]['color'] = (0, 255 - 255*angle_factor, 255*angle_factor)
 
-            if self.show_map:
+            if self.SHOW_MAP:
                 # Map -> Update
                 self.map.objects = [
                     {
@@ -208,8 +227,5 @@ class LidarRaycast():
                     }
                 ]
 
-    def set_angle_value(self, angle, value):
-        self.distances[angle + self.mean_angle] = value
-
-    def distances_to_positions(self):
-        [print(angle) for (angle, i) in (range(self.distances))]
+    def set_angle_data(self, angle, data): # Data = dict(distance, inclination)
+        self.distances[angle + self.mean_angle] = data

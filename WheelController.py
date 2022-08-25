@@ -13,12 +13,15 @@ class WheelController():
         self.target_dist = 0
         self.error_angle = 0
         self.speed = 0
+        self.distances = []
+        self.limit_inclination = 20
 
         self.rover.control.brakes = False
         self.rover.control.wheel_throttle = 0
         self.rover.control.wheel_steering = 0
 
         self.safe_distance = 50
+        self.safe_speed = 1
         self.speed_target = 5
         self.steering_target = 0
 
@@ -46,8 +49,25 @@ class WheelController():
             error_dir = target_dir - rover_dir
             self.error_angle = degrees(atan(error_dir[0]/error_dir[1]))
 
-            self.rover.control.wheel_throttle = self.throttle_pid.calc_pid(self.speed ,self.speed_target)
+            
+
+            # Throttle controller
+            speed_target = self.speed_target
+
+            max_inclination = 0
+            for i in self.distances:
+                inclination = i['inclination']
+                if inclination > max_inclination:
+                    max_inclination = inclination
+                
+            if max_inclination >= self.limit_inclination:
+                speed_target = self.safe_speed
+
+            print(max_inclination)
+
+            self.rover.control.wheel_throttle = self.throttle_pid.calc_pid(self.speed, speed_target)
             self.rover.control.wheel_steering = self.steering_pid.calc_pid(self.error_angle, self.steering_target)
+            
 
             if self.target_dist < self.safe_distance:
                 self.rover.control.brakes = True

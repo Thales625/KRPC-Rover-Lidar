@@ -47,11 +47,13 @@ class Display():
             self.screen = cv2.line(self.screen, self.rover_pos, self.angle_to_pos(self.target_angle, self.lidar_distance), (255, 0, 255), 1)
 
             # Draw Obstacles
-            for i, dist in enumerate(self.distances):
+            for i, data in enumerate(self.distances):
+                dist = data['distance']
+                inclination = data['inclination']
                 if dist <= self.lidar_distance:
                     angle = i-abs(self.interval_angle[1])
-                    factor = dist / self.lidar_distance
-                    color = (factor*255, 0, 255 - factor*255)
+                    factor = inclination / 15
+                    color = (255 - factor*255, 0, factor*255)
                     self.screen = cv2.circle(self.screen, self.angle_to_pos(angle, dist), self.target_radius, color, -1)
 
             # Text
